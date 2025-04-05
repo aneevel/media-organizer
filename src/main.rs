@@ -1,5 +1,8 @@
+use glib::clone;
+
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Button, Orientation, glib};
+use gtk::{self, Application, ApplicationWindow, Button, Orientation, glib};
+
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -37,9 +40,24 @@ fn build_ui(app: &Application) {
     let number = Rc::new(Cell::new(0));
 
     // Connect callbacks, when a button is clicked `number` will be changed
-    let number_copy = number.clone();
-    button_increase.connect_clicked(move |_| number_copy.set(number_copy.get() + 1));
-    button_decrease.connect_clicked(move |_| number.set(number.get() - 1));
+    button_increase.connect_clicked(clone!(
+        #[weak]
+        number,
+        #[strong]
+        button_decrease,
+        move |_| {
+            number.set(number.get() + 1);
+            button_decrease.set_label(&number.get().to_string());
+        }
+    ));
+    button_decrease.connect_clicked(clone!(
+        #[strong]
+        button_increase,
+        move |_| {
+            number.set(number.get() - 1);
+            button_increase.set_label(&number.get().to_string());
+        }
+    ));
 
     // Add buttons to `gtk_box`
     let gtk_box = gtk::Box::builder()
