@@ -1,10 +1,5 @@
-use glib::clone;
-
 use gtk::prelude::*;
 use gtk::{self, Application, ApplicationWindow, Button, Orientation, glib};
-
-use std::cell::Cell;
-use std::rc::Rc;
 
 const APP_ID: &str = "spiceboy.MediaOrganizer";
 
@@ -20,51 +15,20 @@ fn main() -> glib::ExitCode {
 }
 
 fn build_ui(app: &Application) {
-    // Create a button with label and margins
-    let button_increase = Button::builder()
-        .label("Increase!")
+    // Create the ingestion selection button
+    let button_select_ingestion = Button::builder()
+        .label("Choose Ingestion Folder")
         .margin_top(12)
         .margin_bottom(12)
         .margin_start(12)
         .margin_end(12)
         .build();
-    let button_decrease = Button::builder()
-        .label("Decrease!")
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
-        .build();
-
-    // Reference-counted object with inner-mutability
-    let number = Rc::new(Cell::new(0));
-
-    // Connect callbacks, when a button is clicked `number` will be changed
-    button_increase.connect_clicked(clone!(
-        #[weak]
-        number,
-        #[weak]
-        button_decrease,
-        move |_| {
-            number.set(number.get() + 1);
-            button_decrease.set_label(&number.get().to_string());
-        }
-    ));
-    button_decrease.connect_clicked(clone!(
-        #[weak]
-        button_increase,
-        move |_| {
-            number.set(number.get() - 1);
-            button_increase.set_label(&number.get().to_string());
-        }
-    ));
 
     // Add buttons to `gtk_box`
     let gtk_box = gtk::Box::builder()
         .orientation(Orientation::Vertical)
         .build();
-    gtk_box.append(&button_increase);
-    gtk_box.append(&button_decrease);
+    gtk_box.append(&button_select_ingestion);
 
     // Create a window and set the title
     let window = ApplicationWindow::builder()
