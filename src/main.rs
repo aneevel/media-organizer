@@ -3,6 +3,8 @@ use glib::clone;
 use gtk::prelude::*;
 use gtk::{self, Application, ApplicationWindow, Button, FileDialog, Orientation, glib};
 
+use std::fs;
+
 use gio::Cancellable;
 
 const APP_ID: &str = "spiceboy.MediaOrganizer";
@@ -63,6 +65,19 @@ fn build_ui(app: &Application) {
                 if let Ok(file) = result {
                     if let Some(path) = file.path() {
                         println!("Selected folder: {:?}", path);
+
+                        match fs::read_dir(&path) {
+                            Ok(entries) => {
+                                println!("Files in the selected folder: ");
+                                for entry in entries {
+                                    if let Ok(entry) = entry {
+                                        let file_name = entry.file_name();
+                                        println!(" - {:?}", file_name);
+                                    }
+                                }
+                            }
+                            Err(e) => println!("Error reading directory: {}", e),
+                        }
                     }
                 }
             });
