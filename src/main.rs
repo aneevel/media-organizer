@@ -35,7 +35,8 @@ fn build_ui(app: &Application) {
         .application(app)
         .title("Media Organizer")
         .child(&gtk_box)
-        .fullscreened(true)
+        .maximized(true)
+        .deletable(true)
         .build();
 
     // Present window
