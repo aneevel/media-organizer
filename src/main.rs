@@ -43,7 +43,7 @@ fn build_ui(app: &Application) {
     button_increase.connect_clicked(clone!(
         #[weak]
         number,
-        #[strong]
+        #[weak]
         button_decrease,
         move |_| {
             number.set(number.get() + 1);
@@ -51,7 +51,7 @@ fn build_ui(app: &Application) {
         }
     ));
     button_decrease.connect_clicked(clone!(
-        #[strong]
+        #[weak]
         button_increase,
         move |_| {
             number.set(number.get() - 1);
