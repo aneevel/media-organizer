@@ -71,8 +71,11 @@ fn build_ui(app: &Application) {
                                 println!("Files in the selected folder: ");
                                 for entry in entries {
                                     if let Ok(entry) = entry {
-                                        let file_name = entry.file_name();
-                                        println!(" - {:?}", file_name);
+                                        if let Ok(metadata) = entry.metadata() {
+                                            if metadata.is_file() {
+                                                println!(" - {:?}", entry.file_name());
+                                            }
+                                        }
                                     }
                                 }
                             }
