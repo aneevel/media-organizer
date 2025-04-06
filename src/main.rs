@@ -1,7 +1,9 @@
 use glib::clone;
 
 use gtk::prelude::*;
-use gtk::{self, Application, ApplicationWindow, Button, FileDialog, Orientation, glib};
+use gtk::{
+    self, Application, ApplicationWindow, Box, Button, FileDialog, Label, Orientation, glib,
+};
 
 use std::fs;
 
@@ -35,7 +37,7 @@ fn build_ui(app: &Application) {
         .build();
 
     // Add buttons to `gtk_box`
-    let gtk_box = gtk::Box::builder()
+    let gtk_box = Box::builder()
         .orientation(Orientation::Vertical)
         .hexpand(true)
         .vexpand(true)
@@ -61,34 +63,62 @@ fn build_ui(app: &Application) {
                 .modal(true)
                 .build();
 
-            file_dialog.select_folder(Some(&window), Option::<&Cancellable>::None, |result| {
-                if let Ok(file) = result {
-                    if let Some(path) = file.path() {
-                        println!("Selected folder: {:?}", path);
+            file_dialog.select_folder(
+                Some(&window),
+                Option::<&Cancellable>::None,
+                clone!(
+                    #[weak]
+                    window,
+                    move |result| {
+                        if let Ok(file) = result {
+                            if let Some(path) = file.path() {
+                                println!("Selected folder: {:?}", path);
 
-                        // Keep running count
-                        let mut file_count = 0;
+                                // Keep running count
+                                let mut file_count = 0;
 
-                        match fs::read_dir(&path) {
-                            Ok(entries) => {
-                                println!("Files in the selected folder: ");
-                                for entry in entries {
-                                    if let Ok(entry) = entry {
-                                        if let Ok(metadata) = entry.metadata() {
-                                            if metadata.is_file() {
-                                                file_count += 1;
-                                                println!(" - {:?}", entry.file_name());
+                                match fs::read_dir(&path) {
+                                    Ok(entries) => {
+                                        println!("Files in the selected folder: ");
+                                        for entry in entries {
+                                            if let Ok(entry) = entry {
+                                                if let Ok(metadata) = entry.metadata() {
+                                                    if metadata.is_file() {
+                                                        file_count += 1;
+                                                        println!(" - {:?}", entry.file_name());
+                                                    }
+                                                }
                                             }
                                         }
                                     }
+                                    Err(e) => println!("Error reading directory: {}", e),
                                 }
+                                println!("Found {:?} files", file_count);
+
+                                // Construct new GTK Box for file display
+                                let files_box = Box::builder()
+                                    .orientation(Orientation::Vertical)
+                                    .spacing(10)
+                                    .margin_top(12)
+                                    .margin_bottom(12)
+                                    .margin_start(12)
+                                    .margin_end(12)
+                                    .hexpand(true)
+                                    .vexpand(true)
+                                    .build();
+
+                                // Add label
+                                let files_label = Label::builder()
+                                    .label(&format!("{:?} file(s) found", file_count))
+                                    .build();
+                                files_box.append(&files_label);
+
+                                window.set_child(Some(&files_box));
                             }
-                            Err(e) => println!("Error reading directory: {}", e),
                         }
-                        println!("Found {:?} files", file_count);
                     }
-                }
-            });
+                ),
+            );
         }
     ));
 
