@@ -66,6 +66,9 @@ fn build_ui(app: &Application) {
                     if let Some(path) = file.path() {
                         println!("Selected folder: {:?}", path);
 
+                        // Keep running count
+                        let mut file_count = 0;
+
                         match fs::read_dir(&path) {
                             Ok(entries) => {
                                 println!("Files in the selected folder: ");
@@ -73,6 +76,7 @@ fn build_ui(app: &Application) {
                                     if let Ok(entry) = entry {
                                         if let Ok(metadata) = entry.metadata() {
                                             if metadata.is_file() {
+                                                file_count += 1;
                                                 println!(" - {:?}", entry.file_name());
                                             }
                                         }
@@ -81,6 +85,7 @@ fn build_ui(app: &Application) {
                             }
                             Err(e) => println!("Error reading directory: {}", e),
                         }
+                        println!("Found {:?} files", file_count);
                     }
                 }
             });
