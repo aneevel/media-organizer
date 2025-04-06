@@ -1,5 +1,9 @@
+use glib::clone;
+
 use gtk::prelude::*;
-use gtk::{self, Application, ApplicationWindow, Button, Orientation, glib};
+use gtk::{self, Application, ApplicationWindow, Button, FileDialog, Orientation, glib};
+
+use gio::Cancellable;
 
 const APP_ID: &str = "spiceboy.MediaOrganizer";
 
@@ -22,11 +26,17 @@ fn build_ui(app: &Application) {
         .margin_bottom(12)
         .margin_start(12)
         .margin_end(12)
+        .valign(gtk::Align::Center)
+        .vexpand(true)
+        .halign(gtk::Align::Center)
+        .hexpand(true)
         .build();
 
     // Add buttons to `gtk_box`
     let gtk_box = gtk::Box::builder()
         .orientation(Orientation::Vertical)
+        .hexpand(true)
+        .vexpand(true)
         .build();
     gtk_box.append(&button_select_ingestion);
 
@@ -38,6 +48,26 @@ fn build_ui(app: &Application) {
         .maximized(true)
         .deletable(true)
         .build();
+
+    // Call the file select dialog when clicking button
+    button_select_ingestion.connect_clicked(clone!(
+        #[weak]
+        window,
+        move |_| {
+            let file_dialog = FileDialog::builder()
+                .title("Select Ingestion Folder")
+                .modal(true)
+                .build();
+
+            file_dialog.select_folder(Some(&window), Option::<&Cancellable>::None, |result| {
+                if let Ok(file) = result {
+                    if let Some(path) = file.path() {
+                        println!("Selected folder: {:?}", path);
+                    }
+                }
+            });
+        }
+    ));
 
     // Present window
     window.present();
