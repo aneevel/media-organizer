@@ -23,8 +23,22 @@ fn main() -> glib::ExitCode {
 }
 
 fn build_ui(app: &Application) {
-    // Create the ingestion selection button
-    let button_select_ingestion = Button::builder()
+    // Build UI components
+    let button = build_ingestion_button();
+    let gtk_box = build_entry_box(&button);
+    let window = build_main_window(app, &gtk_box);
+
+    // Set up event handlers
+    if let Err(e) = setup_ingestion_file_upload_click(&button, &window) {
+        eprintln!("Error setting up button handler: {}", e);
+    }
+
+    // Present window
+    window.present();
+}
+
+fn build_ingestion_button() -> Button {
+    Button::builder()
         .label("Choose Ingestion Folder")
         .margin_top(12)
         .margin_bottom(12)
@@ -34,27 +48,34 @@ fn build_ui(app: &Application) {
         .vexpand(true)
         .halign(gtk::Align::Center)
         .hexpand(true)
-        .build();
+        .build()
+}
 
-    // Add buttons to `gtk_box`
+fn build_entry_box(button: &Button) -> Box {
     let gtk_box = Box::builder()
         .orientation(Orientation::Vertical)
         .hexpand(true)
         .vexpand(true)
         .build();
-    gtk_box.append(&button_select_ingestion);
+    gtk_box.append(button);
+    gtk_box
+}
 
-    // Create a window and set the title
-    let window = ApplicationWindow::builder()
+fn build_main_window(app: &Application, gtk_box: &Box) -> ApplicationWindow {
+    ApplicationWindow::builder()
         .application(app)
         .title("Media Organizer")
-        .child(&gtk_box)
+        .child(gtk_box)
         .maximized(true)
         .deletable(true)
-        .build();
+        .build()
+}
 
-    // Call the file select dialog when clicking button
-    button_select_ingestion.connect_clicked(clone!(
+fn setup_ingestion_file_upload_click(
+    button: &Button,
+    window: &ApplicationWindow,
+) -> Result<(), String> {
+    button.connect_clicked(clone!(
         #[weak]
         window,
         move |_| {
@@ -72,48 +93,7 @@ fn build_ui(app: &Application) {
                     move |result| {
                         if let Ok(file) = result {
                             if let Some(path) = file.path() {
-                                println!("Selected folder: {:?}", path);
-
-                                // Keep running count
-                                let mut file_count = 0;
-
-                                match fs::read_dir(&path) {
-                                    Ok(entries) => {
-                                        println!("Files in the selected folder: ");
-                                        for entry in entries {
-                                            if let Ok(entry) = entry {
-                                                if let Ok(metadata) = entry.metadata() {
-                                                    if metadata.is_file() {
-                                                        file_count += 1;
-                                                        println!(" - {:?}", entry.file_name());
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    Err(e) => println!("Error reading directory: {}", e),
-                                }
-                                println!("Found {:?} files", file_count);
-
-                                // Construct new GTK Box for file display
-                                let files_box = Box::builder()
-                                    .orientation(Orientation::Vertical)
-                                    .spacing(10)
-                                    .margin_top(12)
-                                    .margin_bottom(12)
-                                    .margin_start(12)
-                                    .margin_end(12)
-                                    .hexpand(true)
-                                    .vexpand(true)
-                                    .build();
-
-                                // Add label
-                                let files_label = Label::builder()
-                                    .label(&format!("{:?} file(s) found", file_count))
-                                    .build();
-                                files_box.append(&files_label);
-
-                                window.set_child(Some(&files_box));
+                                handle_folder_selection(&window, &path);
                             }
                         }
                     }
@@ -122,6 +102,65 @@ fn build_ui(app: &Application) {
         }
     ));
 
-    // Present window
-    window.present();
+    Ok(())
+}
+
+fn handle_folder_selection(window: &ApplicationWindow, path: &std::path::Path) {
+    println!("Selected folder: {:?}", path);
+
+    // Count files in the directory
+    let file_count = match count_files_in_directory(path) {
+        Ok(count) => count,
+        Err(e) => {
+            eprintln!("Error counting files: {}", e);
+            0
+        }
+    };
+
+    // Build and display the files UI
+    let files_box = build_files_display_box(file_count);
+    window.set_child(Some(&files_box));
+}
+
+fn count_files_in_directory(path: &std::path::Path) -> Result<usize, String> {
+    let mut file_count = 0;
+
+    match fs::read_dir(path) {
+        Ok(entries) => {
+            println!("Files in the selected folder: ");
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    if let Ok(metadata) = entry.metadata() {
+                        if metadata.is_file() {
+                            file_count += 1;
+                            println!(" - {:?}", entry.file_name());
+                        }
+                    }
+                }
+            }
+            Ok(file_count)
+        }
+        Err(e) => Err(format!("Error reading directory: {}", e)),
+    }
+}
+
+fn build_files_display_box(file_count: usize) -> Box {
+    let files_box = Box::builder()
+        .orientation(Orientation::Vertical)
+        .spacing(10)
+        .margin_top(12)
+        .margin_bottom(12)
+        .margin_start(12)
+        .margin_end(12)
+        .hexpand(true)
+        .vexpand(true)
+        .build();
+
+    // Add label
+    let files_label = Label::builder()
+        .label(&format!("{} file(s) found", file_count))
+        .build();
+    files_box.append(&files_label);
+
+    files_box
 }
