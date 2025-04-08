@@ -1,10 +1,9 @@
-use glib::clone;
+mod custom_button;
 
 use gtk::prelude::*;
-use gtk::{self, Application, ApplicationWindow, Button, Orientation, glib};
+use gtk::{self, Application, ApplicationWindow, glib};
 
-use std::cell::Cell;
-use std::rc::Rc;
+use custom_button::CustomButton;
 
 const APP_ID: &str = "spiceboy.MediaOrganizer";
 
@@ -20,57 +19,24 @@ fn main() -> glib::ExitCode {
 }
 
 fn build_ui(app: &Application) {
-    // Create a button with label and margins
-    let button_increase = Button::builder()
-        .label("Increase!")
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
-        .build();
-    let button_decrease = Button::builder()
-        .label("Decrease!")
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
-        .build();
+    // Create a Button
+    let button = CustomButton::with_label("Press me!");
+    button.set_margin_top(12);
+    button.set_margin_bottom(12);
+    button.set_margin_start(12);
+    button.set_margin_end(12);
 
-    // Reference-counted object with inner-mutability
-    let number = Rc::new(Cell::new(0));
+    // Connect to "licked" signal of 'button'
+    button.connect_clicked(move |button| {
+        // Set the label to "Hello World!" after the button has been clicked
+        button.set_label("Hello World!");
+    });
 
-    // Connect callbacks, when a button is clicked `number` will be changed
-    button_increase.connect_clicked(clone!(
-        #[weak]
-        number,
-        #[weak]
-        button_decrease,
-        move |_| {
-            number.set(number.get() + 1);
-            button_decrease.set_label(&number.get().to_string());
-        }
-    ));
-    button_decrease.connect_clicked(clone!(
-        #[weak]
-        button_increase,
-        move |_| {
-            number.set(number.get() - 1);
-            button_increase.set_label(&number.get().to_string());
-        }
-    ));
-
-    // Add buttons to `gtk_box`
-    let gtk_box = gtk::Box::builder()
-        .orientation(Orientation::Vertical)
-        .build();
-    gtk_box.append(&button_increase);
-    gtk_box.append(&button_decrease);
-
-    // Create a window and set the title
+    // Create a window
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("Media Organizer")
-        .child(&gtk_box)
+        .title("My GTK App")
+        .child(&button)
         .build();
 
     // Present window
