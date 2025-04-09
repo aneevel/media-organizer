@@ -1,9 +1,10 @@
 use glib::clone;
 
-use gtk::prelude::*;
 use gtk::{
-    self, Application, ApplicationWindow, Box, Button, FileDialog, Label, Orientation, glib,
+    self, Application, ApplicationWindow, Box, Button, FileDialog, Label, ListBox, Orientation,
+    Paned, PolicyType, glib,
 };
+use gtk::{ScrolledWindow, prelude::*};
 
 use std::fs;
 
@@ -118,7 +119,7 @@ fn handle_folder_selection(window: &ApplicationWindow, path: &std::path::Path) {
     };
 
     // Build and display the files UI
-    let files_box = build_files_display_box(file_count);
+    let files_box = build_files_display_box(file_count, path);
     window.set_child(Some(&files_box));
 }
 
@@ -144,7 +145,7 @@ fn count_files_in_directory(path: &std::path::Path) -> Result<usize, String> {
     }
 }
 
-fn build_files_display_box(file_count: usize) -> Box {
+fn build_files_display_box(file_count: usize, path: &std::path::Path) -> Box {
     let files_box = Box::builder()
         .orientation(Orientation::Vertical)
         .spacing(10)
@@ -156,11 +157,29 @@ fn build_files_display_box(file_count: usize) -> Box {
         .vexpand(true)
         .build();
 
-    // Add label
-    let files_label = Label::builder()
+    // Create Paned widget
+    let paned_box = Paned::builder().hexpand(true).vexpand(true).build();
+
+    // Add overview label
+    let files_overview_label = Label::builder()
         .label(&format!("{} file(s) found", file_count))
         .build();
-    files_box.append(&files_label);
+    paned_box.set_start_child(Some(&files_overview_label));
+
+    // Add files display - attaching every file in the path
+    let files_window_label = Label::builder()
+        .label(&format!("{} file(s) to organize", file_count))
+        .build();
+
+    let files_window = ScrolledWindow::builder()
+        .hscrollbar_policy(PolicyType::Never)
+        .hexpand(true)
+        .vexpand(true)
+        .child(&files_window_label)
+        .build();
+    paned_box.set_end_child(Some(&files_window));
+
+    files_box.append(&paned_box);
 
     files_box
 }
