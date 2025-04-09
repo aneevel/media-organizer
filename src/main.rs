@@ -7,6 +7,7 @@ use gtk::{
 use gtk::{ScrolledWindow, prelude::*};
 
 use std::fs;
+use std::path::Path;
 
 use gio::Cancellable;
 
@@ -128,13 +129,11 @@ fn count_files_in_directory(path: &std::path::Path) -> Result<usize, String> {
 
     match fs::read_dir(path) {
         Ok(entries) => {
-            println!("Files in the selected folder: ");
             for entry in entries {
                 if let Ok(entry) = entry {
                     if let Ok(metadata) = entry.metadata() {
                         if metadata.is_file() {
                             file_count += 1;
-                            println!(" - {:?}", entry.file_name());
                         }
                     }
                 }
@@ -179,16 +178,43 @@ fn build_files_display_box(file_count: usize, path: &std::path::Path) -> Box {
     paned_box.set_end_child(Some(&file_overview_pane));
 
     // Add files display - attaching every file in the path
-    let files_window_label = Label::builder()
-        .label(&format!("{} file(s) to organize", file_count))
-        .build();
+    let files_list_box = ListBox::new();
 
     let files_window = ScrolledWindow::builder()
         .hscrollbar_policy(PolicyType::Never)
         .hexpand(true)
         .vexpand(true)
-        .child(&files_window_label)
+        .child(&files_list_box)
         .build();
+
+    // Add all files
+    match fs::read_dir(path) {
+        Ok(entries) => {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    if let Ok(metadata) = entry.metadata() {
+                        if metadata.is_file() {
+                            let new_file_label = Label::builder()
+                                .label(&format!(
+                                    "{:?} {:?} {:?} bytes",
+                                    entry.file_name(),
+                                    Path::new(&entry.file_name())
+                                        .extension()
+                                        .and_then(|ext| ext.to_str())
+                                        .unwrap_or("Unknown Extension"),
+                                    metadata.len()
+                                ))
+                                .build();
+
+                            files_list_box.append(&new_file_label);
+                        }
+                    }
+                }
+            }
+        }
+        Err(e) => println!("Error reading directory: {}", e),
+    }
+
     file_overview_pane.set_start_child(Some(&files_window));
 
     // Add file processing box
