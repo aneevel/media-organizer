@@ -158,13 +158,25 @@ fn build_files_display_box(file_count: usize, path: &std::path::Path) -> Box {
         .build();
 
     // Create Paned widget
-    let paned_box = Paned::builder().hexpand(true).vexpand(true).build();
+    let paned_box = Paned::builder()
+        .orientation(Orientation::Vertical)
+        .hexpand(true)
+        .vexpand(true)
+        .build();
 
     // Add overview label
     let files_overview_label = Label::builder()
         .label(&format!("{} file(s) found", file_count))
         .build();
     paned_box.set_start_child(Some(&files_overview_label));
+
+    // Split bottom pane into two horizontal panes as well - display pane and processing pane
+    let file_overview_pane = Paned::builder()
+        .orientation(Orientation::Horizontal)
+        .hexpand(true)
+        .vexpand(true)
+        .build();
+    paned_box.set_end_child(Some(&file_overview_pane));
 
     // Add files display - attaching every file in the path
     let files_window_label = Label::builder()
@@ -177,7 +189,18 @@ fn build_files_display_box(file_count: usize, path: &std::path::Path) -> Box {
         .vexpand(true)
         .child(&files_window_label)
         .build();
-    paned_box.set_end_child(Some(&files_window));
+    file_overview_pane.set_start_child(Some(&files_window));
+
+    // Add file processing box
+    let file_processing_file_name_label =
+        Label::builder().label(&format!("No file selected")).build();
+    let file_processing_box = Box::builder()
+        .orientation(Orientation::Horizontal)
+        .hexpand(true)
+        .vexpand(true)
+        .build();
+    file_processing_box.append(&file_processing_file_name_label);
+    file_overview_pane.set_end_child(Some(&file_processing_box));
 
     files_box.append(&paned_box);
 
