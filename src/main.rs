@@ -15,7 +15,8 @@ const APP_ID: &str = "spiceboy.MediaOrganizer";
 
 // Define a vector of accepted image file extensions
 // TODO: This should be configurable, let's let the user decide
-const ACCEPTED_IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "svg"];
+const ACCEPTED_IMAGE_EXTENSIONS: &[&str] =
+    &["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "svg"];
 
 // Structure to hold file information
 struct FileInfo {
@@ -128,10 +129,12 @@ fn handle_folder_selection(window: &ApplicationWindow, path: &std::path::Path) {
             // Build and display the files UI
             let files_box = build_files_display_box(&file_list);
             window.set_child(Some(&files_box));
-        },
+        }
         Err(e) => {
             eprintln!("Error processing directory: {}", e);
-            let error_label = Label::builder().label(&format!("Error processing directory: {}", e)).build();
+            let error_label = Label::builder()
+                .label(&format!("Error processing directory: {}", e))
+                .build();
             window.set_child(Some(&error_label));
         }
     }
@@ -147,10 +150,15 @@ fn build_file_list_to_process(path: &Path) -> Result<Vec<FileInfo>, String> {
                     if let Ok(metadata) = entry.metadata() {
                         if metadata.is_file() {
                             // Check if the file has an accepted image extension
-                            if let Some(extension) = entry.path().extension().and_then(|ext| ext.to_str()) {
-                                if ACCEPTED_IMAGE_EXTENSIONS.iter().any(|&accepted| accepted.eq_ignore_ascii_case(extension)) {
+                            if let Some(extension) =
+                                entry.path().extension().and_then(|ext| ext.to_str())
+                            {
+                                if ACCEPTED_IMAGE_EXTENSIONS
+                                    .iter()
+                                    .any(|&accepted| accepted.eq_ignore_ascii_case(extension))
+                                {
                                     let name = entry.file_name().to_string_lossy().to_string();
-                                    
+
                                     // Add file to our list
                                     file_list.push(FileInfo {
                                         path: entry.path(),
@@ -232,6 +240,15 @@ fn build_file_processing_display(file_list: &[FileInfo]) -> Paned {
 fn build_file_processing_list(file_list: &[FileInfo]) -> ScrolledWindow {
     let files_list_box = ListBox::new();
 
+    // Setup row handler
+    files_list_box.connect_row_activated(move |_, row| {
+        if let Some(child) = row.child() {
+            if let Some(label) = child.downcast_ref::<Label>() {
+                println!("Selected file {}", label.label());
+            }
+        }
+    });
+
     let files_window = ScrolledWindow::builder()
         .hscrollbar_policy(PolicyType::Never)
         .hexpand(true)
@@ -244,9 +261,7 @@ fn build_file_processing_list(file_list: &[FileInfo]) -> ScrolledWindow {
         let new_file_label = Label::builder()
             .label(&format!(
                 "{} {} {} bytes",
-                file.name,
-                file.extension,
-                file.size
+                file.name, file.extension, file.size
             ))
             .build();
 
@@ -265,6 +280,6 @@ fn build_file_processor_display() -> Box {
         .vexpand(true)
         .build();
     file_processing_box.append(&file_processing_file_name_label);
-    
+
     file_processing_box
 }
