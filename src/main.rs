@@ -13,6 +13,10 @@ use gio::Cancellable;
 
 const APP_ID: &str = "spiceboy.MediaOrganizer";
 
+// Define a vector of accepted image file extensions
+// TODO: This should be configurable, let's let the user decide
+const ACCEPTED_IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "svg"];
+
 fn main() -> glib::ExitCode {
     // Create the Application
     let app = Application::builder().application_id(APP_ID).build();
@@ -133,7 +137,12 @@ fn count_files_in_directory(path: &std::path::Path) -> Result<usize, String> {
                 if let Ok(entry) = entry {
                     if let Ok(metadata) = entry.metadata() {
                         if metadata.is_file() {
-                            file_count += 1;
+                            // Check if the file has an accepted image extension
+                            if let Some(extension) = entry.path().extension().and_then(|ext| ext.to_str()) {
+                                if ACCEPTED_IMAGE_EXTENSIONS.iter().any(|&accepted| accepted.eq_ignore_ascii_case(extension)) {
+                                    file_count += 1;
+                                }
+                            }
                         }
                     }
                 }
@@ -220,19 +229,21 @@ fn build_file_processing_list(path: &std::path::Path) -> ScrolledWindow {
                 if let Ok(entry) = entry {
                     if let Ok(metadata) = entry.metadata() {
                         if metadata.is_file() {
-                            let new_file_label = Label::builder()
-                                .label(&format!(
-                                    "{:?} {:?} {:?} bytes",
-                                    entry.file_name(),
-                                    Path::new(&entry.file_name())
-                                        .extension()
-                                        .and_then(|ext| ext.to_str())
-                                        .unwrap_or("Unknown Extension"),
-                                    metadata.len()
-                                ))
-                                .build();
+                            // Check if the file has an accepted image extension
+                            if let Some(extension) = Path::new(&entry.file_name()).extension().and_then(|ext| ext.to_str()) {
+                                if ACCEPTED_IMAGE_EXTENSIONS.iter().any(|&accepted| accepted.eq_ignore_ascii_case(extension)) {
+                                    let new_file_label = Label::builder()
+                                        .label(&format!(
+                                            "{:?} {:?} {:?} bytes",
+                                            entry.file_name(),
+                                            extension,
+                                            metadata.len()
+                                        ))
+                                        .build();
 
-                            files_list_box.append(&new_file_label);
+                                    files_list_box.append(&new_file_label);
+                                }
+                            }
                         }
                     }
                 }
