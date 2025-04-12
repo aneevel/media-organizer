@@ -156,6 +156,14 @@ fn build_files_display_box(file_count: usize, path: &std::path::Path) -> Box {
         .vexpand(true)
         .build();
 
+    // Create the paned structure and add it to the main box
+    let paned_box = build_paned_result_structure(file_count, path);
+    files_box.append(&paned_box);
+
+    files_box
+}
+
+fn build_paned_result_structure(file_count: usize, path: &std::path::Path) -> Paned {
     // Create Paned widget
     let paned_box = Paned::builder()
         .orientation(Orientation::Vertical)
@@ -169,15 +177,33 @@ fn build_files_display_box(file_count: usize, path: &std::path::Path) -> Box {
         .build();
     paned_box.set_start_child(Some(&files_overview_label));
 
-    // Split bottom pane into two horizontal panes as well - display pane and processing pane
+    // Split bottom pane into two horizontal panes - display pane and processing pane
+    let file_overview_pane = build_file_processing_display(path);
+    paned_box.set_end_child(Some(&file_overview_pane));
+
+    paned_box
+}
+
+fn build_file_processing_display(path: &std::path::Path) -> Paned {
+    // Split bottom pane into two horizontal panes - display pane and processing pane
     let file_overview_pane = Paned::builder()
         .orientation(Orientation::Horizontal)
         .hexpand(true)
         .vexpand(true)
         .build();
-    paned_box.set_end_child(Some(&file_overview_pane));
 
     // Add files display - attaching every file in the path
+    let files_window = build_file_processing_list(path);
+    file_overview_pane.set_start_child(Some(&files_window));
+
+    // Add file processing box
+    let file_processing_box = build_file_processor_display();
+    file_overview_pane.set_end_child(Some(&file_processing_box));
+
+    file_overview_pane
+}
+
+fn build_file_processing_list(path: &std::path::Path) -> ScrolledWindow {
     let files_list_box = ListBox::new();
 
     let files_window = ScrolledWindow::builder()
@@ -215,9 +241,10 @@ fn build_files_display_box(file_count: usize, path: &std::path::Path) -> Box {
         Err(e) => println!("Error reading directory: {}", e),
     }
 
-    file_overview_pane.set_start_child(Some(&files_window));
+    files_window
+}
 
-    // Add file processing box
+fn build_file_processor_display() -> Box {
     let file_processing_file_name_label =
         Label::builder().label(&format!("No file selected")).build();
     let file_processing_box = Box::builder()
@@ -226,9 +253,6 @@ fn build_files_display_box(file_count: usize, path: &std::path::Path) -> Box {
         .vexpand(true)
         .build();
     file_processing_box.append(&file_processing_file_name_label);
-    file_overview_pane.set_end_child(Some(&file_processing_box));
-
-    files_box.append(&paned_box);
-
-    files_box
+    
+    file_processing_box
 }
