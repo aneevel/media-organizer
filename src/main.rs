@@ -501,6 +501,8 @@ fn setup_output_selection_button_click(
                                         app_state.borrow_mut().set_output_directory(path.clone());
                                         println!("Output directory set to: {:?}", path);
                                     }
+                                } else {
+                                    eprintln!("Selected improper file; not a directory!");
                                 }
                             }
                         }
