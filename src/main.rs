@@ -27,6 +27,14 @@ struct FileInfo {
     size: u64,
 }
 
+// Application state structure
+#[derive(Clone)]
+struct AppState {
+    input_directory: Option<PathBuf>,
+    output_directory: Option<PathBuf>,
+    selected_files: Vec<FileInfo>,
+}
+
 fn main() -> glib::ExitCode {
     // Create the Application
     let app = Application::builder().application_id(APP_ID).build();
@@ -128,7 +136,7 @@ fn handle_folder_selection(window: &ApplicationWindow, path: &std::path::Path) {
     match build_file_list_to_process(path) {
         Ok(file_list) => {
             // Build and display the files UI
-            let files_box = build_files_display_box(&file_list);
+            let files_box = build_files_display_box(&file_list, &window);
             window.set_child(Some(&files_box));
         }
         Err(e) => {
@@ -179,7 +187,7 @@ fn build_file_list_to_process(path: &Path) -> Result<Vec<FileInfo>, String> {
     }
 }
 
-fn build_files_display_box(file_list: &[FileInfo]) -> Box {
+fn build_files_display_box(file_list: &[FileInfo], window: &ApplicationWindow) -> Box {
     let files_box = Box::builder()
         .orientation(Orientation::Vertical)
         .spacing(10)
@@ -192,13 +200,13 @@ fn build_files_display_box(file_list: &[FileInfo]) -> Box {
         .build();
 
     // Create the paned structure and add it to the main box
-    let paned_box = build_paned_result_structure(file_list);
+    let paned_box = build_paned_result_structure(file_list, &window);
     files_box.append(&paned_box);
 
     files_box
 }
 
-fn build_paned_result_structure(file_list: &[FileInfo]) -> Paned {
+fn build_paned_result_structure(file_list: &[FileInfo], window: &ApplicationWindow) -> Paned {
     // Create Paned widget
     let paned_box = Paned::builder()
         .orientation(Orientation::Vertical)
@@ -206,11 +214,28 @@ fn build_paned_result_structure(file_list: &[FileInfo]) -> Paned {
         .vexpand(true)
         .build();
 
-    // Add overview label
+    // Add overview box
+    let file_overview_box = Box::builder()
+        .orientation(Orientation::Vertical)
+        .hexpand(true)
+        .vexpand(true)
+        .build();
+
     let files_overview_label = Label::builder()
         .label(&format!("{} file(s) found", file_list.len()))
         .build();
-    paned_box.set_start_child(Some(&files_overview_label));
+    file_overview_box.append(&files_overview_label);
+
+    // We need an output handler for the output directory
+    let output_selection_button = build_output_selection_button();
+
+    if let Err(e) = setup_output_selection_button_click(&output_selection_button, &window) {
+        eprintln!("Error setting up output selection handler: {}", e);
+    }
+
+    file_overview_box.append(&output_selection_button);
+
+    paned_box.set_start_child(Some(&file_overview_box));
 
     // Split bottom pane into two horizontal panes - display pane and processing pane
     let file_overview_pane = build_file_processing_display(file_list);
@@ -355,4 +380,49 @@ fn create_image_thumbnail(file_path: &std::path::Path, width: i32, height: i32) 
     picture.set_filename(Some(file_path.to_str().unwrap_or("")));
 
     picture
+}
+
+fn build_output_selection_button() -> Button {
+    Button::builder()
+        .label("Set Output Folder")
+        .margin_top(12)
+        .margin_bottom(12)
+        .margin_start(12)
+        .valign(gtk::Align::Center)
+        .vexpand(true)
+        .halign(gtk::Align::Center)
+        .hexpand(true)
+        .build()
+}
+
+fn setup_output_selection_button_click(
+    button: &Button,
+    window: &ApplicationWindow,
+) -> Result<(), String> {
+    button.connect_clicked(clone!(
+        #[weak]
+        window,
+        move |_| {
+            let file_dialog: FileDialog = FileDialog::builder()
+                .title("Select Output Folder")
+                .modal(true)
+                .build();
+
+            file_dialog.select_folder(Some(&window), Option::<&Cancellable>::None, move |result| {
+                if let Ok(file) = result {
+                    if let Ok(file_info) = file.query_info(
+                        "standard::type",
+                        gio::FileQueryInfoFlags::NONE,
+                        None::<&gio::Cancellable>,
+                    ) {
+                        if file_info.file_type() == gio::FileType::Directory {
+                            println!("Selected folder");
+                        }
+                    }
+                }
+            })
+        }
+    ));
+
+    Ok(())
 }
