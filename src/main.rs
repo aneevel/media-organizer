@@ -238,6 +238,8 @@ fn build_file_processing_display(file_list: &[FileInfo]) -> Paned {
         update_file_processor(&file_processing_box_clone, file);
     });
 
+    update_file_processor(&file_processing_box, &file_list[0]);
+
     file_overview_pane.set_start_child(Some(&files_window));
     file_overview_pane.set_end_child(Some(&file_processing_box));
 
