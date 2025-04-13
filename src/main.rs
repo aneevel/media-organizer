@@ -35,6 +35,44 @@ struct AppState {
     selected_files: Vec<FileInfo>,
 }
 
+impl AppState {
+    fn new() -> Self {
+        Self {
+            input_directory: None,
+            output_directory: None,
+            selected_files: Vec::new(),
+        }
+    }
+
+    fn set_input_directory(&mut self, path: PathBuf) {
+        self.input_directory = Some(path);
+    }
+
+    fn get_input_directory(&self) -> Option<&PathBuf> {
+        self.input_directory.as_ref();
+    }
+
+    fn set_output_directory(&mut self, path: PathBuf) {
+        self.output_directory = Some(path);
+    }
+
+    fn get_output_directory(&self) -> Option<&PathBuf> {
+        self.output_directory.as_ref();
+    }
+
+    fn add_selected_file(&mut self, file: FileInfo) {
+        self.selected_files.push(file);
+    }
+
+    fn clear_selected_files(&mut self) {
+        self.selected_files.clear();
+    }
+
+    fn get_selected_files(&self) -> &[FileInfo] {
+        &self.selected_files
+    }
+}
+
 fn main() -> glib::ExitCode {
     // Create the Application
     let app = Application::builder().application_id(APP_ID).build();
