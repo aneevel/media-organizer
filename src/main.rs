@@ -2,7 +2,7 @@ use glib::clone;
 
 use gtk::{
     self, Application, ApplicationWindow, Box, Button, FileDialog, Label, ListBox, Orientation,
-    Paned, PolicyType, glib,
+    Paned, Picture, PolicyType, glib,
 };
 use gtk::{ScrolledWindow, prelude::*};
 
@@ -19,6 +19,7 @@ const ACCEPTED_IMAGE_EXTENSIONS: &[&str] =
     &["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "svg"];
 
 // Structure to hold file information
+#[derive(Clone)]
 struct FileInfo {
     path: PathBuf,
     name: String,
@@ -226,26 +227,37 @@ fn build_file_processing_display(file_list: &[FileInfo]) -> Paned {
         .vexpand(true)
         .build();
 
-    // Add files display - attaching every file in the path
-    let files_window = build_file_processing_list(file_list);
-    file_overview_pane.set_start_child(Some(&files_window));
-
     // Add file processing box
     let file_processing_box = build_file_processor_display();
+    let file_processing_box_clone = file_processing_box.clone();
+
+    // Add files display - attaching every file in the path
+    // Pass the processing box clone so that we can attach it via callback
+    let files_window = build_file_processing_list(file_list, move |file| {
+        // Update file processor when a file is selected
+        update_file_processor(&file_processing_box_clone, file);
+    });
+
+    file_overview_pane.set_start_child(Some(&files_window));
     file_overview_pane.set_end_child(Some(&file_processing_box));
 
     file_overview_pane
 }
 
-fn build_file_processing_list(file_list: &[FileInfo]) -> ScrolledWindow {
+fn build_file_processing_list(
+    file_list: &[FileInfo],
+    on_file_selected: impl Fn(&FileInfo) + 'static,
+) -> ScrolledWindow {
     let files_list_box = ListBox::new();
+
+    // Clone the file_list for use in the closure
+    let file_list_clone = file_list.to_vec();
 
     // Setup row handler
     files_list_box.connect_row_activated(move |_, row| {
-        if let Some(child) = row.child() {
-            if let Some(label) = child.downcast_ref::<Label>() {
-                println!("Selected file {}", label.label());
-            }
+        let index = row.index() as usize;
+        if index < file_list_clone.len() {
+            on_file_selected(&file_list_clone[index]);
         }
     });
 
@@ -282,4 +294,47 @@ fn build_file_processor_display() -> Box {
     file_processing_box.append(&file_processing_file_name_label);
 
     file_processing_box
+}
+
+fn update_file_processor(box_widget: &Box, file: &FileInfo) {
+    // Clear out the previous file information
+    while let Some(child) = box_widget.first_child() {
+        box_widget.remove(&child);
+    }
+
+    // Create content box for image and info
+    let content_box = Box::builder()
+        .orientation(Orientation::Vertical)
+        .spacing(10)
+        .build();
+
+    // add the image thumbnail
+    let thumbnail = create_image_thumbnail(&file.path, 200, 200);
+
+    content_box.append(&thumbnail);
+
+    // Add in the new file info
+    let file_info_label = Label::builder()
+        .label(&format!(
+            "Selected file: {}\nSize: {} bytes\nType: {}",
+            file.name, file.size, file.extension
+        ))
+        .halign(gtk::Align::Start)
+        .build();
+
+    content_box.append(&file_info_label);
+    box_widget.append(&content_box);
+}
+
+fn create_image_thumbnail(file_path: &std::path::Path, width: i32, height: i32) -> Picture {
+    let picture: Picture = Picture::new();
+
+    // Set the size
+    picture.set_content_fit(gtk::ContentFit::Contain);
+    picture.set_size_request(width, height);
+
+    // Load image from file
+    picture.set_filename(Some(file_path.to_str().unwrap_or("")));
+
+    picture
 }

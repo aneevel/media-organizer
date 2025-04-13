@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 gio = "0.20.9"
 gtk = { version = "0.9.6", package = "gtk4", features = ["v4_18"] }
+gdk-pixbuf = "0.17"
