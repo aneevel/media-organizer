@@ -6,8 +6,10 @@ use gtk::{
 };
 use gtk::{ScrolledWindow, prelude::*};
 
+use std::cell::RefCell;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use gio::Cancellable;
 
@@ -49,7 +51,7 @@ impl AppState {
     }
 
     fn get_input_directory(&self) -> Option<&PathBuf> {
-        self.input_directory.as_ref();
+        self.input_directory.as_ref()
     }
 
     fn set_output_directory(&mut self, path: PathBuf) {
@@ -57,7 +59,7 @@ impl AppState {
     }
 
     fn get_output_directory(&self) -> Option<&PathBuf> {
-        self.output_directory.as_ref();
+        self.output_directory.as_ref()
     }
 
     fn add_selected_file(&mut self, file: FileInfo) {
@@ -77,21 +79,27 @@ fn main() -> glib::ExitCode {
     // Create the Application
     let app = Application::builder().application_id(APP_ID).build();
 
+    // Create main application state
+    let app_state = Rc::new(RefCell::new(AppState::new()));
+
     // Connect to "activate" signal of "app"
-    app.connect_activate(build_ui);
+    let app_state_clone = Rc::clone(&app_state);
+    app.connect_activate(move |app| {
+        build_ui(app, Rc::clone(&app_state_clone));
+    });
 
     // Run the application
     app.run()
 }
 
-fn build_ui(app: &Application) {
+fn build_ui(app: &Application, app_state: Rc<RefCell<AppState>>) {
     // Build UI components
     let button = build_ingestion_button();
     let gtk_box = build_entry_box(&button);
     let window = build_main_window(app, &gtk_box);
 
     // Set up event handlers
-    if let Err(e) = setup_ingestion_file_upload_click(&button, &window) {
+    if let Err(e) = setup_ingestion_file_upload_click(&button, &window, Rc::clone(&app_state)) {
         eprintln!("Error setting up button handler: {}", e);
     }
 
@@ -136,10 +144,13 @@ fn build_main_window(app: &Application, gtk_box: &Box) -> ApplicationWindow {
 fn setup_ingestion_file_upload_click(
     button: &Button,
     window: &ApplicationWindow,
+    app_state: Rc<RefCell<AppState>>,
 ) -> Result<(), String> {
     button.connect_clicked(clone!(
         #[weak]
         window,
+        #[strong]
+        app_state,
         move |_| {
             let file_dialog = FileDialog::builder()
                 .title("Select Ingestion Folder")
@@ -152,10 +163,14 @@ fn setup_ingestion_file_upload_click(
                 clone!(
                     #[weak]
                     window,
+                    #[strong]
+                    app_state,
                     move |result| {
                         if let Ok(file) = result {
                             if let Some(path) = file.path() {
-                                handle_folder_selection(&window, &path);
+                                app_state.borrow_mut().set_input_directory(path.clone());
+
+                                handle_folder_selection(&window, &path, Rc::clone(&app_state));
                             }
                         }
                     }
@@ -167,14 +182,18 @@ fn setup_ingestion_file_upload_click(
     Ok(())
 }
 
-fn handle_folder_selection(window: &ApplicationWindow, path: &std::path::Path) {
+fn handle_folder_selection(
+    window: &ApplicationWindow,
+    path: &std::path::Path,
+    app_state: Rc<RefCell<AppState>>,
+) {
     println!("Selected folder: {:?}", path);
 
     // Build list of files to process
     match build_file_list_to_process(path) {
         Ok(file_list) => {
             // Build and display the files UI
-            let files_box = build_files_display_box(&file_list, &window);
+            let files_box = build_files_display_box(&file_list, &window, Rc::clone(&app_state));
             window.set_child(Some(&files_box));
         }
         Err(e) => {
@@ -225,7 +244,11 @@ fn build_file_list_to_process(path: &Path) -> Result<Vec<FileInfo>, String> {
     }
 }
 
-fn build_files_display_box(file_list: &[FileInfo], window: &ApplicationWindow) -> Box {
+fn build_files_display_box(
+    file_list: &[FileInfo],
+    window: &ApplicationWindow,
+    app_state: Rc<RefCell<AppState>>,
+) -> Box {
     let files_box = Box::builder()
         .orientation(Orientation::Vertical)
         .spacing(10)
@@ -238,13 +261,17 @@ fn build_files_display_box(file_list: &[FileInfo], window: &ApplicationWindow) -
         .build();
 
     // Create the paned structure and add it to the main box
-    let paned_box = build_paned_result_structure(file_list, &window);
+    let paned_box = build_paned_result_structure(file_list, &window, Rc::clone(&app_state));
     files_box.append(&paned_box);
 
     files_box
 }
 
-fn build_paned_result_structure(file_list: &[FileInfo], window: &ApplicationWindow) -> Paned {
+fn build_paned_result_structure(
+    file_list: &[FileInfo],
+    window: &ApplicationWindow,
+    app_state: Rc<RefCell<AppState>>,
+) -> Paned {
     // Create Paned widget
     let paned_box = Paned::builder()
         .orientation(Orientation::Vertical)
@@ -267,7 +294,11 @@ fn build_paned_result_structure(file_list: &[FileInfo], window: &ApplicationWind
     // We need an output handler for the output directory
     let output_selection_button = build_output_selection_button();
 
-    if let Err(e) = setup_output_selection_button_click(&output_selection_button, &window) {
+    if let Err(e) = setup_output_selection_button_click(
+        &output_selection_button,
+        &window,
+        Rc::clone(&app_state),
+    ) {
         eprintln!("Error setting up output selection handler: {}", e);
     }
 
@@ -276,13 +307,16 @@ fn build_paned_result_structure(file_list: &[FileInfo], window: &ApplicationWind
     paned_box.set_start_child(Some(&file_overview_box));
 
     // Split bottom pane into two horizontal panes - display pane and processing pane
-    let file_overview_pane = build_file_processing_display(file_list);
+    let file_overview_pane = build_file_processing_display(file_list, Rc::clone(&app_state));
     paned_box.set_end_child(Some(&file_overview_pane));
 
     paned_box
 }
 
-fn build_file_processing_display(file_list: &[FileInfo]) -> Paned {
+fn build_file_processing_display(
+    file_list: &[FileInfo],
+    app_state: Rc<RefCell<AppState>>,
+) -> Paned {
     // Split bottom pane into two horizontal panes - display pane and processing pane
     let file_overview_pane = Paned::builder()
         .orientation(Orientation::Horizontal)
@@ -436,29 +470,43 @@ fn build_output_selection_button() -> Button {
 fn setup_output_selection_button_click(
     button: &Button,
     window: &ApplicationWindow,
+    app_state: Rc<RefCell<AppState>>,
 ) -> Result<(), String> {
     button.connect_clicked(clone!(
         #[weak]
         window,
+        #[strong]
+        app_state,
         move |_| {
             let file_dialog: FileDialog = FileDialog::builder()
                 .title("Select Output Folder")
                 .modal(true)
                 .build();
 
-            file_dialog.select_folder(Some(&window), Option::<&Cancellable>::None, move |result| {
-                if let Ok(file) = result {
-                    if let Ok(file_info) = file.query_info(
-                        "standard::type",
-                        gio::FileQueryInfoFlags::NONE,
-                        None::<&gio::Cancellable>,
-                    ) {
-                        if file_info.file_type() == gio::FileType::Directory {
-                            println!("Selected folder");
+            file_dialog.select_folder(
+                Some(&window),
+                Option::<&Cancellable>::None,
+                clone!(
+                    #[strong]
+                    app_state,
+                    move |result| {
+                        if let Ok(file) = result {
+                            if let Ok(file_info) = file.query_info(
+                                "standard::type",
+                                gio::FileQueryInfoFlags::NONE,
+                                None::<&gio::Cancellable>,
+                            ) {
+                                if file_info.file_type() == gio::FileType::Directory {
+                                    if let Some(path) = file.path() {
+                                        app_state.borrow_mut().set_output_directory(path.clone());
+                                        println!("Output directory set to: {:?}", path);
+                                    }
+                                }
+                            }
                         }
                     }
-                }
-            })
+                ),
+            );
         }
     ));
 
