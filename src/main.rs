@@ -1,8 +1,8 @@
 use glib::clone;
 
 use gtk::{
-    self, Application, ApplicationWindow, Box, Button, FileDialog, Label, ListBox, Orientation,
-    Paned, Picture, PolicyType, glib,
+    self, Application, ApplicationWindow, Box, Button, Entry, FileDialog, Label, ListBox,
+    Orientation, Paned, Picture, PolicyType, glib,
 };
 use gtk::{ScrolledWindow, prelude::*};
 
@@ -304,8 +304,8 @@ fn update_file_processor(box_widget: &Box, file: &FileInfo) {
         box_widget.remove(&child);
     }
 
-    // Create content box for image and info
-    let content_box = Box::builder()
+    // Create summary box for image and info
+    let summary_box = Box::builder()
         .orientation(Orientation::Vertical)
         .spacing(10)
         .build();
@@ -313,7 +313,7 @@ fn update_file_processor(box_widget: &Box, file: &FileInfo) {
     // add the image thumbnail
     let thumbnail = create_image_thumbnail(&file.path, 200, 200);
 
-    content_box.append(&thumbnail);
+    summary_box.append(&thumbnail);
 
     // Add in the new file info
     let file_info_label = Label::builder()
@@ -324,8 +324,24 @@ fn update_file_processor(box_widget: &Box, file: &FileInfo) {
         .halign(gtk::Align::Start)
         .build();
 
-    content_box.append(&file_info_label);
-    box_widget.append(&content_box);
+    // Add the output section
+    let output_box: Box = Box::builder()
+        .orientation(Orientation::Horizontal)
+        .spacing(10)
+        .build();
+
+    let output_label: Label = Label::builder()
+        .label(&format!("Output File Name"))
+        .halign(gtk::Align::Start)
+        .build();
+    output_box.append(&output_label);
+
+    let output_name_edit = Entry::builder().build();
+    output_box.append(&output_name_edit);
+
+    summary_box.append(&file_info_label);
+    summary_box.append(&output_box);
+    box_widget.append(&summary_box);
 }
 
 fn create_image_thumbnail(file_path: &std::path::Path, width: i32, height: i32) -> Picture {
