@@ -190,10 +190,10 @@ fn handle_folder_selection(
     println!("Selected folder: {:?}", path);
 
     // Build list of files to process
-    match build_file_list_to_process(path) {
-        Ok(file_list) => {
+    match build_file_list_to_process(path, Rc::clone(&app_state)) {
+        Ok(()) => {
             // Build and display the files UI
-            let files_box = build_files_display_box(&file_list, &window, Rc::clone(&app_state));
+            let files_box = build_files_display_box(&window, Rc::clone(&app_state));
             window.set_child(Some(&files_box));
         }
         Err(e) => {
@@ -206,9 +206,7 @@ fn handle_folder_selection(
     }
 }
 
-fn build_file_list_to_process(path: &Path) -> Result<Vec<FileInfo>, String> {
-    let mut file_list = Vec::new();
-
+fn build_file_list_to_process(path: &Path, app_state: Rc<RefCell<AppState>>) -> Result<(), String> {
     match fs::read_dir(path) {
         Ok(entries) => {
             for entry in entries {
@@ -225,8 +223,7 @@ fn build_file_list_to_process(path: &Path) -> Result<Vec<FileInfo>, String> {
                                 {
                                     let name = entry.file_name().to_string_lossy().to_string();
 
-                                    // Add file to our list
-                                    file_list.push(FileInfo {
+                                    app_state.borrow_mut().add_selected_file(FileInfo {
                                         path: entry.path(),
                                         name,
                                         extension: extension.to_string(),
@@ -238,17 +235,13 @@ fn build_file_list_to_process(path: &Path) -> Result<Vec<FileInfo>, String> {
                     }
                 }
             }
-            Ok(file_list)
+            Ok(())
         }
         Err(e) => Err(format!("Error reading directory: {}", e)),
     }
 }
 
-fn build_files_display_box(
-    file_list: &[FileInfo],
-    window: &ApplicationWindow,
-    app_state: Rc<RefCell<AppState>>,
-) -> Box {
+fn build_files_display_box(window: &ApplicationWindow, app_state: Rc<RefCell<AppState>>) -> Box {
     let files_box = Box::builder()
         .orientation(Orientation::Vertical)
         .spacing(10)
@@ -261,14 +254,13 @@ fn build_files_display_box(
         .build();
 
     // Create the paned structure and add it to the main box
-    let paned_box = build_paned_result_structure(file_list, &window, Rc::clone(&app_state));
+    let paned_box = build_paned_result_structure(&window, Rc::clone(&app_state));
     files_box.append(&paned_box);
 
     files_box
 }
 
 fn build_paned_result_structure(
-    file_list: &[FileInfo],
     window: &ApplicationWindow,
     app_state: Rc<RefCell<AppState>>,
 ) -> Paned {
@@ -287,7 +279,10 @@ fn build_paned_result_structure(
         .build();
 
     let files_overview_label = Label::builder()
-        .label(&format!("{} file(s) found", file_list.len()))
+        .label(&format!(
+            "{} file(s) found",
+            app_state.borrow().get_selected_files().len()
+        ))
         .build();
     file_overview_box.append(&files_overview_label);
 
@@ -307,16 +302,13 @@ fn build_paned_result_structure(
     paned_box.set_start_child(Some(&file_overview_box));
 
     // Split bottom pane into two horizontal panes - display pane and processing pane
-    let file_overview_pane = build_file_processing_display(file_list, Rc::clone(&app_state));
+    let file_overview_pane = build_file_processing_display(Rc::clone(&app_state));
     paned_box.set_end_child(Some(&file_overview_pane));
 
     paned_box
 }
 
-fn build_file_processing_display(
-    file_list: &[FileInfo],
-    app_state: Rc<RefCell<AppState>>,
-) -> Paned {
+fn build_file_processing_display(app_state: Rc<RefCell<AppState>>) -> Paned {
     // Split bottom pane into two horizontal panes - display pane and processing pane
     let file_overview_pane = Paned::builder()
         .orientation(Orientation::Horizontal)
@@ -330,12 +322,18 @@ fn build_file_processing_display(
 
     // Add files display - attaching every file in the path
     // Pass the processing box clone so that we can attach it via callback
-    let files_window = build_file_processing_list(file_list, move |file| {
-        // Update file processor when a file is selected
-        update_file_processor(&file_processing_box_clone, file);
-    });
+    let files_window = build_file_processing_list(
+        move |file| {
+            // Update file processor when a file is selected
+            update_file_processor(&file_processing_box_clone, file);
+        },
+        Rc::clone(&app_state),
+    );
 
-    update_file_processor(&file_processing_box, &file_list[0]);
+    update_file_processor(
+        &file_processing_box,
+        &app_state.borrow_mut().get_selected_files()[0],
+    );
 
     file_overview_pane.set_start_child(Some(&files_window));
     file_overview_pane.set_end_child(Some(&file_processing_box));
@@ -344,13 +342,13 @@ fn build_file_processing_display(
 }
 
 fn build_file_processing_list(
-    file_list: &[FileInfo],
     on_file_selected: impl Fn(&FileInfo) + 'static,
+    app_state: Rc<RefCell<AppState>>,
 ) -> ScrolledWindow {
     let files_list_box = ListBox::new();
 
     // Clone the file_list for use in the closure
-    let file_list_clone = file_list.to_vec();
+    let file_list_clone = app_state.borrow().get_selected_files().to_vec();
 
     // Setup row handler
     files_list_box.connect_row_activated(move |_, row| {
@@ -368,7 +366,7 @@ fn build_file_processing_list(
         .build();
 
     // Add all files from our file_list
-    for file in file_list {
+    for file in app_state.borrow().get_selected_files() {
         let new_file_label = Label::builder()
             .label(&format!(
                 "{} {} {} bytes",
