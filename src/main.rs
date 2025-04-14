@@ -1,9 +1,5 @@
-mod custom_button;
-
 use gtk::prelude::*;
-use gtk::{self, Application, ApplicationWindow, glib};
-
-use custom_button::CustomButton;
+use gtk::{self, Align, Application, ApplicationWindow, Box, Orientation, Switch, glib};
 
 const APP_ID: &str = "spiceboy.MediaOrganizer";
 
@@ -19,20 +15,37 @@ fn main() -> glib::ExitCode {
 }
 
 fn build_ui(app: &Application) {
-    // Create a Button
-    let button = CustomButton::with_label("Press me!");
-    button.set_margin_top(12);
-    button.set_margin_bottom(12);
-    button.set_margin_start(12);
-    button.set_margin_end(12);
+    // Create the switches
+    let switch_1 = Switch::new();
+    let switch_2 = Switch::new();
+
+    // Bind the switch active properties together
+    switch_1
+        .bind_property("active", &switch_2, "active")
+        .bidirectional()
+        .build();
+
+    // Set up box
+    let gtk_box = Box::builder()
+        .margin_top(12)
+        .margin_bottom(12)
+        .margin_start(12)
+        .margin_end(12)
+        .valign(Align::Center)
+        .halign(Align::Center)
+        .spacing(12)
+        .orientation(Orientation::Vertical)
+        .build();
+    gtk_box.append(&switch_1);
+    gtk_box.append(&switch_2);
 
     // Create a window
     let window = ApplicationWindow::builder()
         .application(app)
         .title("My GTK App")
-        .child(&button)
+        .child(&gtk_box)
         .build();
 
-    // Present window
+    // Present the window
     window.present();
 }
