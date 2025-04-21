@@ -8,7 +8,7 @@ use gtk::{ScrolledWindow, prelude::*};
 
 use std::cell::RefCell;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use gio::Cancellable;
@@ -170,7 +170,7 @@ fn setup_ingestion_file_upload_click(
                             if let Some(path) = file.path() {
                                 app_state.borrow_mut().set_input_directory(path.clone());
 
-                                handle_folder_selection(&window, &path, Rc::clone(&app_state));
+                                handle_folder_selection(&window, Rc::clone(&app_state));
                             }
                         }
                     }
@@ -182,15 +182,14 @@ fn setup_ingestion_file_upload_click(
     Ok(())
 }
 
-fn handle_folder_selection(
-    window: &ApplicationWindow,
-    path: &std::path::Path,
-    app_state: Rc<RefCell<AppState>>,
-) {
-    println!("Selected folder: {:?}", path);
+fn handle_folder_selection(window: &ApplicationWindow, app_state: Rc<RefCell<AppState>>) {
+    println!(
+        "Selected folder: {:?}",
+        app_state.borrow_mut().get_input_directory()
+    );
 
     // Build list of files to process
-    match build_file_list_to_process(path, Rc::clone(&app_state)) {
+    match build_file_list_to_process(Rc::clone(&app_state)) {
         Ok(()) => {
             // Build and display the files UI
             let files_box = build_files_display_box(&window, Rc::clone(&app_state));
@@ -206,8 +205,14 @@ fn handle_folder_selection(
     }
 }
 
-fn build_file_list_to_process(path: &Path, app_state: Rc<RefCell<AppState>>) -> Result<(), String> {
-    match fs::read_dir(path) {
+fn build_file_list_to_process(app_state: Rc<RefCell<AppState>>) -> Result<(), String> {
+    match fs::read_dir(
+        app_state
+            .borrow_mut()
+            .get_input_directory()
+            .unwrap()
+            .as_path(),
+    ) {
         Ok(entries) => {
             for entry in entries {
                 if let Ok(entry) = entry {
