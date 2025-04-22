@@ -168,7 +168,11 @@ fn setup_ingestion_file_upload_click(
                     move |result| {
                         if let Ok(file) = result {
                             if let Some(path) = file.path() {
-                                app_state.borrow_mut().set_input_directory(path.clone());
+                                // This feels like playing with fire but it avoids the panic?
+                                {
+                                    let mut state = app_state.borrow_mut();
+                                    state.set_input_directory(path.clone());
+                                }
 
                                 handle_folder_selection(&window, Rc::clone(&app_state));
                             }
@@ -183,11 +187,6 @@ fn setup_ingestion_file_upload_click(
 }
 
 fn handle_folder_selection(window: &ApplicationWindow, app_state: Rc<RefCell<AppState>>) {
-    println!(
-        "Selected folder: {:?}",
-        app_state.borrow_mut().get_input_directory()
-    );
-
     // Build list of files to process
     match build_file_list_to_process(Rc::clone(&app_state)) {
         Ok(()) => {
@@ -206,13 +205,15 @@ fn handle_folder_selection(window: &ApplicationWindow, app_state: Rc<RefCell<App
 }
 
 fn build_file_list_to_process(app_state: Rc<RefCell<AppState>>) -> Result<(), String> {
-    match fs::read_dir(
-        app_state
-            .borrow_mut()
+    let input_dir = {
+        let state = app_state.borrow();
+        state
             .get_input_directory()
-            .unwrap()
-            .as_path(),
-    ) {
+            .ok_or("No input directory selected")?
+            .clone()
+    };
+
+    match fs::read_dir(input_dir.as_path()) {
         Ok(entries) => {
             for entry in entries {
                 if let Ok(entry) = entry {
@@ -294,8 +295,15 @@ fn build_paned_result_structure(
     // We need an output handler for the output directory
     let output_selection_button = build_output_selection_button();
 
+    // A label for the output directory would be nice too
+    let output_directory_label = Label::builder()
+        .label("No output directory selected")
+        .build();
+    file_overview_box.append(&output_directory_label);
+
     if let Err(e) = setup_output_selection_button_click(
         &output_selection_button,
+        &output_directory_label,
         &window,
         Rc::clone(&app_state),
     ) {
@@ -337,7 +345,7 @@ fn build_file_processing_display(app_state: Rc<RefCell<AppState>>) -> Paned {
 
     update_file_processor(
         &file_processing_box,
-        &app_state.borrow_mut().get_selected_files()[0],
+        &app_state.borrow().get_selected_files()[0],
     );
 
     file_overview_pane.set_start_child(Some(&files_window));
@@ -472,12 +480,15 @@ fn build_output_selection_button() -> Button {
 
 fn setup_output_selection_button_click(
     button: &Button,
+    label: &Label,
     window: &ApplicationWindow,
     app_state: Rc<RefCell<AppState>>,
 ) -> Result<(), String> {
     button.connect_clicked(clone!(
         #[weak]
         window,
+        #[weak]
+        label,
         #[strong]
         app_state,
         move |_| {
@@ -490,6 +501,8 @@ fn setup_output_selection_button_click(
                 Some(&window),
                 Option::<&Cancellable>::None,
                 clone!(
+                    #[weak]
+                    label,
                     #[strong]
                     app_state,
                     move |result| {
@@ -503,6 +516,10 @@ fn setup_output_selection_button_click(
                                     if let Some(path) = file.path() {
                                         app_state.borrow_mut().set_output_directory(path.clone());
                                         println!("Output directory set to: {:?}", path);
+                                        label.set_label(&format!(
+                                            "Output directory: {}",
+                                            path.as_path().to_str().unwrap()
+                                        ));
                                     }
                                 } else {
                                     eprintln!("Selected improper file; not a directory!");
